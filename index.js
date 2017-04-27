@@ -1,13 +1,15 @@
 var Registry = require('azure-iothub').Registry.fromConnectionString("HostName=zhqqi-iot3.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=dN8WuSEfFvwdcoAFRR/T+iFEzPMI3lWChIHSty6JDGs=");
 var exec = require('child_process').exec;
 var util = require('util');
+var fs = require('fs');
 var cmd = 'docker run -i --rm -v C:/Users/v-zhq/IoT/javatest4/test2:/usr/src/mj -w /usr/src/mj maven mvn compile exec:java -Dexec.args="%s %d"';
 
-var NUM = 100;
+var NUM = 10;
 var NUM_MESSAGE_PER_DEVICE = 100;
 var stat = {
     numExec:0,
     numDone:0,
+    devices:[], // changed_times,msg_sent,msg_respond
 };
 main();
 function main() {
@@ -36,7 +38,15 @@ function main() {
                         console.log(error.message);
                     } else {
                         console.log(util.format("Device %s complete. (%d/%d)",id,++stat.numDone,NUM));
-                        console.log(stdout);
+                        stat.devices[id].changed_times = stdout.match(/Sampling rate changed to/g).length;
+                        stat.devices[id].msg_sent = stdout.match(/Event Message \\d+/g).length;
+                        stat.devices[id].msg_respond = stdout.match(/IoT Hub responded to message \\d+/g).length;
+                        fs.writeFile("log/"+id+".log",stdout);
+                        if(stat.numDone == NUM) {
+                            //finished
+                            console.log(stat);
+                            fs.writeFile("log/main.log",stat);
+                        }
                     }
                 }).bind(deviceCS[i].id));
                 console.log(util.format("Device %s started. (%d/%d)",deviceCS[i].id,++stat.numExec,NUM));

@@ -9,8 +9,9 @@ var NUM_MESSAGE_PER_DEVICE = 100;
 var stat = {
     numExec:0,
     numDone:0,
-    devices:[], // changed_times,msg_sent,msg_respond
+    devices:{}, // changed_times,msg_sent,msg_respond
 };
+
 main();
 function main() {
     var deviceCS = [];
@@ -35,20 +36,27 @@ function main() {
             for (var i = 0; i < NUM; i++) {
                 exec(util.format(cmd,deviceCS[i].cs,NUM_MESSAGE_PER_DEVICE), { maxBuffer: 1024 * 500 }, (function (id, error, stdout, stderr) {
                     if (error) {
-                        console.log(error.message);
+                        console.log("Error" + error);
                     } else {
                         console.log(util.format("Device %s complete. (%d/%d)",id,++stat.numDone,NUM));
-                        stat.devices[id].changed_times = stdout.match(/Sampling rate changed to/g).length;
-                        stat.devices[id].msg_sent = stdout.match(/Event Message \\d+/g).length;
-                        stat.devices[id].msg_respond = stdout.match(/IoT Hub responded to message \\d+/g).length;
-                        fs.writeFile("log/"+id+".log",stdout);
+                        stdout = stdout.substring(stdout.indexOf('Starting...'));
+                        var m1 = stdout.match(/Sampling rate changed to/g);
+                        var m2 = stdout.match(/Event Message \d+/g);
+                        var m3 = stdout.match(/IoT Hub responded to message \d+/g);
+                        if(!stat.devices[id]) {
+                            stat.devices[id] = {};
+                        }
+                        stat.devices[id].changed_times = ( m1 == null ? 0 : m1.length);
+                        stat.devices[id].msg_sent = ( m2 == null ? 0 : m2.length);
+                        stat.devices[id].msg_respond = ( m3 == null ? 0 : m3.length);
+                        fs.writeFile("log/"+id+".log",stdout,()=>{});
                         if(stat.numDone == NUM) {
                             //finished
                             console.log(stat);
-                            fs.writeFile("log/main.log",stat);
+                            fs.writeFile("log/main.log",stat,()=>{});
                         }
                     }
-                }).bind(deviceCS[i].id));
+                }).bind(this,deviceCS[i].id));
                 console.log(util.format("Device %s started. (%d/%d)",deviceCS[i].id,++stat.numExec,NUM));
             }
         }

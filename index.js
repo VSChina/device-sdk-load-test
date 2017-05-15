@@ -1,11 +1,13 @@
-var Registry = require('azure-iothub').Registry.fromConnectionString("HostName=zhqqi-iot3.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=dN8WuSEfFvwdcoAFRR/T+iFEzPMI3lWChIHSty6JDGs=");
+var Registry = require('azure-iothub').Registry.fromConnectionString("HostName=iot-mj95.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=mLXcv0xMUk04VUuLIjbr2tYJLDXGjPOE7js4uItENZo=");
 var exec = require('child_process').exec;
 var util = require('util');
 var fs = require('fs');
 var cmd = 'docker run -i --rm -v C:/Users/v-zhq/.m2:/root/.m2 -v C:/Users/v-zhq/IoT/javatest4/test2:/usr/src/mj -w /usr/src/mj maven:3.5.0-jdk-8 mvn exec:java -Dexec.args="%s %d"'; // remove compile cmd to avoid conflict volume
 
-var NUM_OF_DEVICES = 20;
-var NUM_MESSAGE_PER_DEVICE = 5;
+var cmd2 = 'mvn exec:java -Dexec.args="%s %d"';
+
+var NUM_OF_DEVICES = 100;
+var NUM_MESSAGE_PER_DEVICE = 10;
 var stat = {
     numExec: 0,
     numDone: 0,
@@ -24,21 +26,21 @@ function main() {
             console.log('mjerror')
         } else {
             console.log(`${deviceList.length} device(s) found.`);
-            var reg = new RegExp("d(\\d+)");
+            var reg = new RegExp("device(\\d+)");
             deviceList.forEach((device) => {
                 var matches = reg.exec(device.deviceId);
                 if (matches) {
                     if (parseInt(matches[1]) >= 0 && parseInt(matches[1]) < NUM_OF_DEVICES) {
                         deviceCS.push({
                             id: device.deviceId,
-                            cs: "HostName=zhqqi-iot3.azure-devices.net;DeviceId=" + device.deviceId + ";SharedAccessKey=" + device.authentication.symmetricKey.primaryKey
+                            cs: "HostName=iot-mj95.azure-devices.net;DeviceId=" + device.deviceId + ";SharedAccessKey=" + device.authentication.symmetricKey.primaryKey
                         });
                     }
                 }
             });
             console.log(util.format("Devices retrieved. (%d/%d)", deviceCS.length, NUM_OF_DEVICES));
             for (var i = 0; i < NUM_OF_DEVICES; i++) {
-                exec(util.format(cmd, deviceCS[i].cs, NUM_MESSAGE_PER_DEVICE), { maxBuffer: 1024 * 500 }, (function (id, error, stdout, stderr) {
+                exec(util.format(cmd2, deviceCS[i].cs, NUM_MESSAGE_PER_DEVICE), { maxBuffer: 1024 * 500, cwd:"C:/Users/v-zhq/IoT/javatest4/test2" }, (function (id, error, stdout, stderr) {
                     if (error) {
                         console.log("Error with "+ id + "\n" + error);
                         stat.numDone++;
@@ -49,7 +51,7 @@ function main() {
 
                     }
                     var m1 = stdout.match(/Sampling rate changed to/g);
-                    var m2 = stdout.match(/Event Message \d+/g);
+                    var m2 = stdout.match(/Sending Message zhqqi/g);
                     var m3 = stdout.match(/IoT Hub responded to message \d+/g);
                     if (!stat.devices[id]) {
                         stat.devices[id] = {};
@@ -93,7 +95,7 @@ function main() {
 function addDevice(num) {
     var devices = [];
     for (var i = 0; i < num; i++) {
-        devices.push({ deviceId: "d" + i });
+        devices.push({ deviceId: "device" + i });
         if (devices.length == 100) {
             Registry.addDevices(devices, ((i, err, b, c) => {
                 if (err) {
@@ -104,13 +106,21 @@ function addDevice(num) {
             devices = [];
         }
     }
-
+    if (devices.length != 0) {
+            Registry.addDevices(devices, ((i, err, b, c) => {
+                if (err) {
+                    console.log("error" + err.message);
+                }
+                console.log("finished with " + i);
+            }).bind(this, i + 1));
+            devices = [];
+        }
 }
 
 function removeDevice(num) {
     var devices = [];
     for (var i = 0; i < num; i++) {
-        devices.push({ deviceId: "d" + i });
+        devices.push({ deviceId: "device" + i });
         if (devices.length == 100) {
             Registry.removeDevices(devices, false, ((i, err, b, c) => {
                 if (err) {
